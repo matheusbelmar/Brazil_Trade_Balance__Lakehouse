@@ -1,0 +1,89 @@
+x-common-environment: &common-environment
+  AWS_ACCESS_KEY_ID: admin
+  AWS_SECRET_ACCESS_KEY: password
+  AWS_REGION: us-east-1
+
+services:
+
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: demo_catalog
+      POSTGRES_HOST_AUTH_METHOD: md5
+    depends_on:
+      - object-store
+    networks:
+      iceberg_net:
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d demo_catalog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  object-store:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    networks:
+      iceberg_net:
+        aliases:
+          - warehouse.minio
+    volumes:
+      - minio_data:/data
+    ports:
+      - 9001:9001
+      - 9000:9000
+    command: ["server", "/data", "--console-address", ":9001"]
+    healthcheck:
+      test: ["CMD-SHELL", "mc alias set minio http://localhost:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} && mc mb minio/warehouse && mc anonymous set public minio/warehouse"]
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+  trino:
+    image: 'trinodb/trino'
+    container_name: trino
+    networks:
+      iceberg_net:
+    volumes:
+      - ./etc/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties
+    ports:
+      - '8080:8080'
+    depends_on:
+      - object-store
+      - rest
+    environment:
+      <<: *common-environment
+
+  rest:
+    image: tabulario/iceberg-rest
+    container_name: rest
+    networks:
+      iceberg_net:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - 8181:8181
+    environment:
+      <<: *common-environment
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio:9000
+      CATALOG_URI: jdbc:postgresql://postgres/demo_catalog
+      CATALOG_JDBC_USER: admin
+      CATALOG_JDBC_PASSWORD: password
+
+networks:
+  iceberg_net:
+
+volumes:
+  postgres_data:
+  minio_data:
