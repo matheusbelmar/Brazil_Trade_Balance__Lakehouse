@@ -8,7 +8,8 @@ DROP SCHEMA iceberg.silver;
 CREATE SCHEMA IF NOT EXISTS iceberg.silver
 WITH (location = 's3a://datalake/silver');
 
-CREATE TABLE IF NOT EXISTS iceberg.silver.br_setex_tb_ISIC_CUCI (
+
+CREATE TABLE iceberg.silver.br_setex_bot_isic_cuci3 (
     tipo             VARCHAR,
     co_ano           INT,
     co_mes           INT,
@@ -16,20 +17,13 @@ CREATE TABLE IF NOT EXISTS iceberg.silver.br_setex_tb_ISIC_CUCI (
     no_isic_secao    VARCHAR,
     co_cuci_pos      VARCHAR,
     no_cuci_pos      VARCHAR,
-    vl_fob_usd       DECIMAL(18,2),
-    kg_liquido       DECIMAL(18,2)
-)
-WITH (
-    format = 'parquet',
-    location = 's3a://datalake/silver/br_setex_tb_ISIC_CUCI'
-	);
-
-
-CREATE TABLE iceberg.bronze.test_table (
-    id INT
-)
-WITH (
-    format = 'PARQUET',
-    location = 's3://datalake/test_table/'
+    vl_fob_usd       BIGINT,
+    kg_liquido       BIGINT
+)WITH (
+    partitioning = ARRAY['co_ano','co_mes']
 );
+SELECT *
+FROM iceberg.silver.br_setex_bot_isic_cuci3
 
+
+FROM iceberg.silver.br_setex_bot_isic_cuci3;

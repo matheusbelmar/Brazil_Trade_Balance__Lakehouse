@@ -21,18 +21,18 @@ fs = s3fs.S3FileSystem(
     use_ssl=False                  
 )
 
-bucket_name = "s3://warehouse"
+bucket_name = "s3://datalake"
 prefix = "bronze/trade_balance/"  # onde você quer salvar
-file_name="202509/ISIC_BR_Data.parquet"
+file_name="ISIC_BR_Data.parquet"
 
 minio_path=os.path.join(bucket_name, prefix, file_name)
 
-print(minio_path)
-print(df_TB_ISIC_CUCI.columns)
+#print(minio_path)
+#print(df_TB_ISIC_CUCI.columns)
 
-print(fs.ls("datalake"))
+#print(fs.ls("datalake"))
 
-print(fs.ls("/"))
+#print(fs.ls("/"))
 
 # Export
 pq.write_to_dataset(
