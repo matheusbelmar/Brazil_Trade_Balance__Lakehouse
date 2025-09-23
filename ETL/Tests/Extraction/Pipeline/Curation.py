@@ -2,11 +2,8 @@ import os
 import s3fs
 import pandas as pd
 import pyarrow as pa
-from decimal import Decimal
 from datetime import datetime
-from pyiceberg.schema import Schema
 from pyiceberg.catalog import load_catalog
-from pyiceberg.types import StringType, IntegerType, DecimalType, TimestampType
 
 def load_from_land (
     schema:     str, 
@@ -47,13 +44,13 @@ def pandas_to_arrow(
         "CO_ISIC_SECAO":    ("co_isic_secao", str),
         "NO_ISIC_SECAO":    ("no_isic_secao", str),
         "CO_CUCI_POS":      ("co_cuci_pos",   str),
-        "NO_CUCI_POS":      ("no_cuci_pos",   str)
-       # "dt_ingest":        ("dt_ingest",     "datetime64[s]")
+        "NO_CUCI_POS":      ("no_cuci_pos",   str),
+        "US$ VL_FOB":       ("vl_fob_usd",    int),
+        "KG_LIQUIDO":       ("kg_liquido",    int),
+        "dt_ingest":        ("dt_ingest",     "datetime64[s]")
         }
 
     df_stg = pd.DataFrame({pd_Schema[i][0]: df_data[i].astype(pd_Schema[i][1]) for i in pd_Schema})
-    df_stg["vl_fob_usd"]=df_data["US$ VL_FOB"].apply(int)
-    df_stg["kg_liquido"]=df_data["KG_LIQUIDO"].apply(int)
 
     arrow_schema = pa.schema([
         ('tipo',            pa.string()),
@@ -64,8 +61,8 @@ def pandas_to_arrow(
         ('co_cuci_pos',     pa.string()),
         ('no_cuci_pos',     pa.string()),
         ('vl_fob_usd',      pa.int64()),
-        ('kg_liquido',      pa.int64())
-       # ('dt_ingest',       pa.timestamp('s'))
+        ('kg_liquido',      pa.int64()),
+        ('dt_ingest',       pa.timestamp('s'))
         ])
 
     return pa.Table.from_pandas(df_stg, schema=arrow_schema, preserve_index=False)
@@ -76,15 +73,15 @@ def up_till_iceberg(
 
     # Rest configs
     catalog = load_catalog(
-        "rest",
-        uri="http://localhost:8181",
-        s3={
-            "endpoint": "http://localhost:9000", 
-            "access-key-id": "admin", 
-            "secret-access-key": "password"
-            }
-        )
-
+    "rest",
+    uri="http://localhost:8181",
+    **{
+        "s3.endpoint": "http://localhost:9000",
+        "s3.access-key-id": "admin",
+        "s3.secret-access-key": "password",
+        "py-io-impl": "pyiceberg.io.fsspec.FsspecFileIO",
+        }
+    )
     # Iceberg Table
     tbl = catalog.load_table(("silver", "br_setex_bot_isic_cuci"))
     tbl.append(arrow_table)
@@ -100,20 +97,4 @@ if __name__ == "__main__":
                     now=datetime.today().replace(second=0)
                     )
     Arrow_table=pandas_to_arrow(Raw_table)
-#    up_till_iceberg(Arrow_table)
-Arrow_table
-catalog = load_catalog(
-    "rest",
-    uri="http://localhost:8181",
-    s3={
-        "endpoint": "http://localhost:9000", 
-        "access-key-id": "admin", 
-        "secret-access-key": "password"
-        },
-    io_impl="pyiceberg.io.pyarrow.PyArrowFileIO"
-    )
-# Iceberg Table
-tbl = catalog.load_table(("silver", "br_setex_bot_isic_cuci3"))
-tbl.append(Arrow_table)
-
-print(tbl)
+    up_till_iceberg(Arrow_table)
