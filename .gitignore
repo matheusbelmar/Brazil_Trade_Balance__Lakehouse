@@ -1,2 +1,4 @@
 /py_venv1/
-**/dbt_venv/
+/dbt_env/
+**/Notes.ipynb
+py_venv_requirements.txt

@@ -87,6 +87,19 @@ services:
       - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
       - CATALOG_S3_ENDPOINT=http://minio:9000
 
+  dbt:
+    build: ./dbt  
+    container_name: dbt
+    networks:
+      - iceberg_net
+    volumes:
+      - ./dbt/app:/usr/app  
+    working_dir: /usr/app
+    environment:
+      DBT_PROFILES_DIR: /usr/app
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+
 networks:
   iceberg_net:
 
