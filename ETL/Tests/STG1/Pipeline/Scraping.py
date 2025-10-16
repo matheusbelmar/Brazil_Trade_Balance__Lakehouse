@@ -14,7 +14,7 @@ fs = s3fs.S3FileSystem(
     use_ssl=False                  
     )
 
-response = req.get(url)
+response = req.get(url, verify=False)
 response.raise_for_status()  
 
 bucket_name = "s3://datalake"

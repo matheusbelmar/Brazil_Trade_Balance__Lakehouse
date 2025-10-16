@@ -98,3 +98,4 @@ if __name__ == "__main__":
                     )
     Arrow_table=pandas_to_arrow(Raw_table)
     up_till_iceberg(Arrow_table)
+    

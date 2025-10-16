@@ -24,4 +24,3 @@ CREATE TABLE iceberg.silver.br_setex_bot_isic_cuci (
 );
 
 
-

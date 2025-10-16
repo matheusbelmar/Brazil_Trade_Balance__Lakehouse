@@ -1,25 +1,22 @@
 services:
 
-#  postgres:
-#    image: postgres:13
-#    container_name: postgres
-#    environment:
-#      PGDATA: /var/lib/postgresql/data
-#      POSTGRES_USER: admin
-#      POSTGRES_PASSWORD: password
-#      POSTGRES_DB: demo_catalog
-#      POSTGRES_HOST_AUTH_METHOD: md5
-#    depends_on:
-#      - object-store
-#    networks:
-#      iceberg_net:
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U admin -d demo_catalog"]
-#      interval: 5s
-#      timeout: 5s
-#      retries: 5
+  postgres:
+    image: postgres:12
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=demo_catalog
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - iceberg_net
+    ports:
+      - "6543:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d demo_catalog"]
+      interval: 5s
+      retries: 5
 
   minio:
     image: minio/minio
@@ -36,6 +33,8 @@ services:
       - 9001:9001
       - 9000:9000
     command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - minio_data:/data 
 
   mc:
     depends_on:
@@ -62,6 +61,8 @@ services:
     container_name: trino
     networks:
       iceberg_net:
+    environment:
+      CATALOG_MANAGEMENT: 'dynamic'
     volumes:
       - ./etc/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties
     ports:
@@ -78,14 +79,28 @@ services:
     ports:
       - 8181:8181
     depends_on:
-      - mc
+      mc:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./drivers/postgresql-42.7.5.jar:/usr/lib/iceberg-rest/postgresql-42.7.5.jar
     environment:
+      # AWS Credentials
       - AWS_ACCESS_KEY_ID=admin
       - AWS_SECRET_ACCESS_KEY=password
       - AWS_REGION=us-east-1
+
+      # MinIO configs
       - CATALOG_WAREHOUSE=s3://datalake/
       - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
       - CATALOG_S3_ENDPOINT=http://minio:9000
+
+      # JDBC (Postgres)
+      - CATALOG_URI=jdbc:postgresql://postgres:5432/demo_catalog
+      - CATALOG_JDBC_USER=admin
+      - CATALOG_JDBC_PASSWORD=password
+    command: java -cp /usr/lib/iceberg-rest/*:iceberg-rest-adapter.jar org.apache.iceberg.rest.RESTCatalogServer
 
   dbt:
     build: ./dbt  
@@ -104,5 +119,5 @@ networks:
   iceberg_net:
 
 volumes:
-#  postgres_data:
+  postgres_data:
   minio_data:
