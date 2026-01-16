@@ -114,7 +114,6 @@ services:
       DBT_PROFILES_DIR: /usr/app
     entrypoint: ["tail", "-f", "/dev/null"]
 
-
 networks:
   iceberg_net:
 

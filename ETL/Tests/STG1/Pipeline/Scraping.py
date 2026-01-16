@@ -15,7 +15,7 @@ fs = s3fs.S3FileSystem(
     )
 
 response = req.get(url, verify=False)
-response.raise_for_status()  
+##response.raise_for_status()  
 
 bucket_name = "s3://datalake"
 prefix = "bronze/trade_balance/"  
@@ -28,3 +28,5 @@ with fs.open(minio_path, "wb") as handle:
 
 
 #Scrap >> Landing_Bronze >> Iceberg_Curation_Silver
+
+
