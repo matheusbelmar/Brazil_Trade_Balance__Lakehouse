@@ -2,3 +2,5 @@
 /dbt_env/
 **/Notes.ipynb
 py_venv_requirements.txt
+/ingestion/*
+!/ingestion/.gitkeep

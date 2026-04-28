@@ -1,0 +1,122 @@
+services:
+
+  postgres:
+    image: postgres:12
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=demo_catalog
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - iceberg_net
+    ports:
+      - "6543:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d demo_catalog"]
+      interval: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password
+      - MINIO_DOMAIN=minio
+    networks:
+      iceberg_net:
+        aliases:
+          - datalake.minio
+    ports:
+      - 9001:9001
+      - 9000:9000
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - minio_data:/data 
+
+  mc:
+    depends_on:
+      - minio
+    image: minio/mc
+    container_name: mc
+    networks:
+      iceberg_net:
+    environment:
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add minio http://minio:9000 admin password) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc rm -r --force minio/datalake;
+      /usr/bin/mc mb minio/datalake;
+      /usr/bin/mc policy set public minio/datalake;
+      tail -f /dev/null
+      "    
+
+  trino:
+    image: 'trinodb/trino'
+    container_name: trino
+    networks:
+      iceberg_net:
+    environment:
+      CATALOG_MANAGEMENT: 'dynamic'
+    volumes:
+      - ./etc/catalog/iceberg.properties:/etc/trino/catalog/iceberg.properties
+    ports:
+      - '8080:8080'
+    depends_on:
+      - mc
+      - rest
+
+  rest:
+    image: tabulario/iceberg-rest
+    container_name: rest
+    networks:
+      iceberg_net:
+    ports:
+      - 8181:8181
+    depends_on:
+      mc:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./drivers/postgresql-42.7.5.jar:/usr/lib/iceberg-rest/postgresql-42.7.5.jar
+    environment:
+      # AWS Credentials
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password
+      - AWS_REGION=us-east-1
+
+      # MinIO configs
+      - CATALOG_WAREHOUSE=s3://datalake/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://minio:9000
+
+      # JDBC (Postgres)
+      - CATALOG_URI=jdbc:postgresql://postgres:5432/demo_catalog
+      - CATALOG_JDBC_USER=admin
+      - CATALOG_JDBC_PASSWORD=password
+    command: java -cp /usr/lib/iceberg-rest/*:iceberg-rest-adapter.jar org.apache.iceberg.rest.RESTCatalogServer
+
+  # dbt:
+  #   build: ./dbt  
+  #   container_name: dbt
+  #   networks:
+  #     - iceberg_net
+  #   volumes:
+  #     - ./dbt/app:/usr/app  
+  #   working_dir: /usr/app
+  #   environment:
+  #     DBT_PROFILES_DIR: /usr/app
+  #   entrypoint: ["tail", "-f", "/dev/null"]
+
+networks:
+  iceberg_net:
+
+volumes:
+  postgres_data:
+  minio_data:
